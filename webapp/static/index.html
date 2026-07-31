@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Org Chart API Tester</title>
+  <link rel="stylesheet" href="/static/styles.css?v=4" />
+</head>
+<body>
+  <!-- Top connection panel -->
+  <header class="connection-bar" aria-label="Connection">
+    <div class="brand">
+      <span class="brand-dot" aria-hidden="true"></span>
+      <span class="brand-name">Org Chart API Tester</span>
+      <span class="brand-badge" id="mode-badge" title="Execution mode">mock</span>
+    </div>
+    <form id="connection-form" class="connection-fields" autocomplete="off">
+      <label class="field">
+        <span>Host</span>
+        <input id="conn-host" name="host" type="text" placeholder="i-0abc.workdaysuv.com" required />
+      </label>
+      <label class="field">
+        <span>Tenant</span>
+        <input id="conn-tenant" name="tenant" type="text" placeholder="super" required />
+      </label>
+      <label class="field" id="conn-username-field">
+        <span>Username</span>
+        <input id="conn-username" name="username" type="text" placeholder="persona / user" />
+      </label>
+      <label class="field">
+        <span>Password</span>
+        <input id="conn-password" name="password" type="password" placeholder="SUV password, or Bearer … on SkyLab" required />
+      </label>
+      <button id="get-token-button" class="btn btn-ghost btn-get-token" type="button">Get token</button>
+      <label class="field field-mode">
+        <span>Mode</span>
+        <select id="execution-mode" aria-label="Execution mode">
+          <option value="mock">Mock</option>
+          <option value="live">Live</option>
+        </select>
+      </label>
+      <button id="conn-button" class="btn btn-primary" type="submit">Connect</button>
+      <button id="probe-button" class="btn btn-ghost" type="button" hidden>Probe OAuth</button>
+      <button id="disconnect-button" class="btn btn-ghost" type="button" hidden>Disconnect</button>
+      <div class="conn-status" id="conn-status" role="status" aria-live="polite">
+        <span class="status-dot" data-state="disconnected"></span>
+        <span class="status-text">Disconnected</span>
+      </div>
+    </form>
+  </header>
+
+  <!-- OAuth helper (SkyLab live mode) -->
+  <div id="oauth-panel" class="oauth-panel" hidden>
+    <span class="oauth-label">OAuth</span>
+    <label class="field">
+      <span>Client ID</span>
+      <input id="oauth-client-id" type="text" autocomplete="off" placeholder="API client ID" />
+    </label>
+    <label class="field">
+      <span>Client Secret</span>
+      <input id="oauth-client-secret" type="password" autocomplete="off" placeholder="••••••••" />
+    </label>
+    <label class="field field-wide">
+      <span>Refresh Token</span>
+      <input id="oauth-refresh-token" type="password" autocomplete="off" placeholder="Per-user refresh token" />
+    </label>
+    <button id="oauth-get-token-button" class="btn btn-ghost" type="button">Get token</button>
+    <span class="oauth-hint">SkyLab: exchange refresh token → Bearer in Password.</span>
+  </div>
+
+  <!-- Main 3-column workspace -->
+  <main class="workspace">
+    <!-- Left navigation -->
+    <nav class="panel nav-panel" aria-label="Endpoints">
+      <div class="panel-header">
+        <h2>Endpoints</h2>
+        <input id="endpoint-filter" class="filter-input" type="search" placeholder="Filter…" aria-label="Filter endpoints" />
+      </div>
+      <div id="endpoint-list" class="endpoint-list" role="listbox" aria-label="Endpoint catalog">
+        <div class="empty-hint">Loading catalog…</div>
+      </div>
+    </nav>
+
+    <!-- Center: dynamic form -->
+    <section class="panel form-panel" aria-label="Request">
+      <div class="panel-header">
+        <h2>Request</h2>
+        <span id="form-endpoint-tag" class="endpoint-tag" hidden></span>
+      </div>
+      <div id="form-container" class="form-container">
+        <div class="empty-hint">Select an endpoint from the left to build a request.</div>
+      </div>
+      <div class="form-actions" id="form-actions" hidden>
+        <button id="send-button" class="btn btn-primary" type="button">Send Request</button>
+        <button id="reset-button" class="btn btn-ghost" type="button">Reset</button>
+        <span class="hint kbd-hint">⌘/Ctrl + Enter to send</span>
+      </div>
+    </section>
+
+    <!-- Right: response viewer -->
+    <section class="panel response-panel" aria-label="Response">
+      <div class="panel-header">
+        <h2>Response</h2>
+        <button id="copy-button" class="btn btn-ghost btn-small" type="button" hidden>Copy response</button>
+      </div>
+      <div id="response-container" class="response-container">
+        <div class="empty-hint">No response yet.</div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Bottom: session history -->
+  <footer class="panel history-panel" aria-label="Session history">
+    <div class="panel-header">
+      <h2>History <span id="history-count" class="muted"></span></h2>
+      <button id="clear-history" class="btn btn-ghost btn-small" type="button">Clear</button>
+    </div>
+    <div class="history-table-wrap">
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>Time</th><th>Endpoint</th><th>Persona</th><th>Upstream</th><th>Duration</th>
+          </tr>
+        </thead>
+        <tbody id="history-body">
+          <tr class="empty-row"><td colspan="5">No requests yet this session.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </footer>
+
+  <!-- Toast host -->
+  <div id="toast-host" class="toast-host" aria-live="assertive"></div>
+
+  <!-- Loading overlay -->
+  <div id="loading" class="loading-overlay" aria-hidden="true">
+    <div class="spinner" aria-label="Loading"></div>
+  </div>
+
+  <script type="module" src="/static/js/main.js?v=7"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "environment": "skylab",
+  "personas": {
+    "A": { "identityRef": "env:OC_SKYLAB_USER_A", "credentialRef": "env:OC_SKYLAB_TOKEN_A", "expect": "full-access" },
+    "B": { "identityRef": "env:OC_SKYLAB_USER_B", "credentialRef": "env:OC_SKYLAB_TOKEN_B", "expect": "restricted-hierarchy" },
+    "C": { "identityRef": "env:OC_SKYLAB_USER_C", "credentialRef": "env:OC_SKYLAB_TOKEN_C", "expect": "no-navigate-org-domain" },
+    "D": { "identityRef": "env:OC_SKYLAB_USER_D", "credentialRef": "env:OC_SKYLAB_TOKEN_D", "expect": "segmented-visibility" }
+  },
+  "wids": {
+    "ORG_VIS": "TBD", "ORG_HID": "TBD", "WKR_VIS": "TBD", "WKR_HID": "TBD",
+    "POS_VIS": "TBD", "POS_HID": "TBD", "CHILD_HP": "TBD", "PARENT_MIX": "TBD",
+    "ORG_BIG": "TBD", "WID_BAD": "00000000000000000000000000000000", "WID_GHOST": "TBD"
+  },
+  "filters": { "FLT_OK": "TBD", "FLT_BAD": "TBD" }
+}

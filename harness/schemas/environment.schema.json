@@ -1,0 +1,185 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:workday:oc:org-21922:environment.schema",
+  "title": "Org Chart REST API Security Test — Environment Configuration (source document)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["activeEnvironment", "defaults", "environments"],
+
+  "definitions": {
+    "ref": {
+      "type": "string",
+      "pattern": "^(env:|secret:)[A-Za-z0-9_]+$",
+      "description": "Reference to a value via env var or secret store. MUST NOT be a literal secret."
+    },
+    "noSecretLiterals": {
+      "description": "SHALLOW, NON-RECURSIVE guard. Forbids obvious credential keys at THIS object level only; does NOT guarantee absence of secrets deeper in the tree. A runtime secret-shape scan is still required.",
+      "not": {
+        "anyOf": [
+          { "required": ["password"] }, { "required": ["clientSecret"] },
+          { "required": ["refreshToken"] }, { "required": ["token"] },
+          { "required": ["cookie"] }, { "required": ["apiKey"] }, { "required": ["secret"] }
+        ]
+      }
+    },
+    "tls": {
+      "type": "object", "additionalProperties": false, "required": ["verify"],
+      "properties": { "verify": { "type": "boolean" }, "reason": { "type": "string", "minLength": 1 } }
+    },
+    "toggle": {
+      "type": "object", "additionalProperties": false, "required": ["name", "expectedState"],
+      "properties": {
+        "name": { "type": "string" },
+        "expectedState": { "enum": ["on", "off", "tbd"] },
+        "source": { "type": "string" }
+      }
+    },
+    "auth": {
+      "type": "object", "additionalProperties": false, "required": ["model"],
+      "allOf": [{ "$ref": "#/definitions/noSecretLiterals" }],
+      "properties": {
+        "model": { "enum": ["tbd", "oauth2_refresh_token_per_user", "oauth2_client_credentials_acting_as"] },
+        "supportedModels": {
+          "type": "array",
+          "items": { "enum": ["oauth2_refresh_token_per_user", "oauth2_client_credentials_acting_as"] }
+        },
+        "scheme": { "const": "Bearer" },
+        "tokenUrlTemplate": { "type": "string" },
+        "clientIdRef": { "$ref": "#/definitions/ref" },
+        "clientSecretRef": { "$ref": "#/definitions/ref" },
+        "actingAs": {
+          "type": "object", "additionalProperties": false,
+          "description": "Only for oauth2_client_credentials_acting_as. Mechanism TBD until SkyLab auth confirmed.",
+          "properties": {
+            "mechanism": { "type": "string" },
+            "headerName": { "type": "string" },
+            "valueRef": { "$ref": "#/definitions/ref" }
+          }
+        }
+      }
+    },
+    "defaultHeaders": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Strict allowlist. Credential-bearing headers (Authorization, Cookie, Set-Cookie, etc.) are rejected.",
+      "properties": {
+        "Accept": { "type": "string" },
+        "Accept-Language": { "type": "string" },
+        "Content-Type": { "type": "string" }
+      }
+    },
+    "timeouts": {
+      "type": "object", "additionalProperties": false,
+      "required": ["connectMs", "readMs", "tokenMs"],
+      "properties": {
+        "connectMs": { "type": "integer", "minimum": 1 },
+        "readMs": { "type": "integer", "minimum": 1 },
+        "tokenMs": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "pagination": {
+      "type": "object", "additionalProperties": false,
+      "required": ["defaultLimit", "maxLimit", "promptMaxLimit"],
+      "properties": {
+        "defaultLimit": { "type": "integer", "minimum": 1 },
+        "maxLimit": { "type": "integer", "minimum": 1 },
+        "promptMaxLimit": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "evidenceBase": {
+      "type": "object", "additionalProperties": false, "required": ["collect"],
+      "properties": {
+        "collect": { "type": "boolean" },
+        "dir": { "type": "string" },
+        "redactHeaders": { "type": "array", "items": { "type": "string" } },
+        "captureResponseHeaders": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+
+  "properties": {
+    "$schema": { "type": "string" },
+    "activeEnvironment": { "enum": ["suv", "skylab"] },
+
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenant", "restBaseTemplate", "toggle", "auth", "defaultHeaders", "timeouts", "pagination", "roles"],
+      "allOf": [{ "$ref": "#/definitions/noSecretLiterals" }],
+      "properties": {
+        "tenant": { "type": "string" },
+        "restBaseTemplate": { "type": "string" },
+        "toggle": { "$ref": "#/definitions/toggle" },
+        "auth": { "$ref": "#/definitions/auth" },
+        "defaultHeaders": { "$ref": "#/definitions/defaultHeaders" },
+        "timeouts": { "$ref": "#/definitions/timeouts" },
+        "pagination": { "$ref": "#/definitions/pagination" },
+        "evidence": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "redactHeaders": { "type": "array", "items": { "type": "string" } },
+            "captureResponseHeaders": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "roles": { "type": "array", "minItems": 1, "items": { "enum": ["A", "B", "C", "D"] } }
+      }
+    },
+
+    "environments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["suv", "skylab"],
+      "properties": {
+
+        "suv": {
+          "type": "object", "additionalProperties": false,
+          "allOf": [{ "$ref": "#/definitions/noSecretLiterals" }],
+          "required": ["host", "tls", "evidence", "testDataRef"],
+          "properties": {
+            "purpose": { "type": "string" },
+            "host": { "type": "string" },
+            "tenant": { "type": "string" },
+            "restBaseTemplate": { "type": "string" },
+            "tls": {
+              "allOf": [{ "$ref": "#/definitions/tls" }],
+              "if": { "properties": { "verify": { "const": false } } },
+              "then": { "required": ["verify", "reason"] }
+            },
+            "evidence": {
+              "allOf": [{ "$ref": "#/definitions/evidenceBase" }],
+              "properties": { "collect": { "const": false } }
+            },
+            "auth": { "$ref": "#/definitions/auth" },
+            "toggle": { "$ref": "#/definitions/toggle" },
+            "testDataRef": { "type": "string" }
+          }
+        },
+
+        "skylab": {
+          "type": "object", "additionalProperties": false,
+          "allOf": [{ "$ref": "#/definitions/noSecretLiterals" }],
+          "required": ["host", "tls", "evidence", "testDataRef"],
+          "properties": {
+            "purpose": { "type": "string" },
+            "host": { "type": "string" },
+            "tenant": { "type": "string" },
+            "restBaseTemplate": { "type": "string" },
+            "tls": {
+              "allOf": [{ "$ref": "#/definitions/tls" }],
+              "properties": { "verify": { "const": true } },
+              "description": "Official environment: TLS verification is mandatory."
+            },
+            "evidence": {
+              "allOf": [{ "$ref": "#/definitions/evidenceBase" }],
+              "required": ["collect", "dir"],
+              "properties": { "collect": { "const": true } }
+            },
+            "auth": { "$ref": "#/definitions/auth" },
+            "toggle": { "$ref": "#/definitions/toggle" },
+            "testDataRef": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

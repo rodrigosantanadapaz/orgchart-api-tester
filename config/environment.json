@@ -1,0 +1,53 @@
+{
+  "$schema": "../harness/schemas/environment.schema.json",
+  "activeEnvironment": "suv",
+
+  "defaults": {
+    "tenant": "super",
+    "restBaseTemplate": "https://{host}/ccx/api/orgchart/v1/{tenant}",
+    "toggle": {
+      "name": "TBD",
+      "expectedState": "tbd",
+      "source": "TO CONFIRM from implementation evidence (do not assume ORG-21934)"
+    },
+    "auth": {
+      "model": "tbd",
+      "supportedModels": ["oauth2_refresh_token_per_user", "oauth2_client_credentials_acting_as"],
+      "scheme": "Bearer",
+      "tokenUrlTemplate": "https://{host}/ccx/oauth2/{tenant}/token",
+      "clientIdRef": "env:OC_OAUTH_CLIENT_ID",
+      "clientSecretRef": "env:OC_OAUTH_CLIENT_SECRET"
+    },
+    "defaultHeaders": { "Accept": "application/json", "Accept-Language": "en-US" },
+    "timeouts": { "connectMs": 5000, "readMs": 30000, "tokenMs": 15000 },
+    "pagination": { "defaultLimit": 20, "maxLimit": 100, "promptMaxLimit": 1000 },
+    "evidence": {
+      "redactHeaders": ["authorization", "cookie", "set-cookie"],
+      "captureResponseHeaders": ["wd-stat-request-id", "wd-ratelimit-tokens-remaining", "content-type"]
+    },
+    "roles": ["A", "B", "C", "D"]
+  },
+
+  "environments": {
+    "suv": {
+      "purpose": "Quick sanity validation (NOT evidence-grade)",
+      "host": "TBD",
+      "restBaseTemplate": "https://{host}/ccx/internalapi/orgchart/v1/{tenant}",
+      "tls": { "verify": true },
+      "evidence": { "collect": false },
+      "auth": { "model": "tbd" },
+      "toggle": { "name": "TBD", "expectedState": "tbd" },
+      "testDataRef": "./test-data.suv.json"
+    },
+    "skylab": {
+      "purpose": "Official security test execution + evidence collection",
+      "host": "TBD",
+      "restBaseTemplate": "https://{host}/ccx/internalapi/orgchart/v1/{tenant}",
+      "tls": { "verify": true },
+      "evidence": { "collect": true, "dir": "evidence/skylab/{testId}" },
+      "auth": { "model": "tbd" },
+      "toggle": { "name": "TBD", "expectedState": "tbd" },
+      "testDataRef": "./test-data.skylab.json"
+    }
+  }
+}

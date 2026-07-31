@@ -1,0 +1,104 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:workday:oc:org-21922:test-data.schema",
+  "title": "Org Chart REST API Security Test — Environment Test Data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["environment", "personas", "wids", "filters"],
+
+  "definitions": {
+    "ref": {
+      "type": "string",
+      "pattern": "^(env:|secret:)[A-Za-z0-9_]+$",
+      "description": "Reference-only. Literal identities/credentials are rejected."
+    },
+    "noSecretLiterals": {
+      "not": {
+        "anyOf": [
+          { "required": ["identity"] }, { "required": ["username"] },
+          { "required": ["password"] }, { "required": ["token"] },
+          { "required": ["refreshToken"] }, { "required": ["clientSecret"] },
+          { "required": ["cookie"] }, { "required": ["apiKey"] }, { "required": ["secret"] }
+        ]
+      }
+    },
+    "widValue": {
+      "anyOf": [
+        { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+        { "const": "TBD" }
+      ],
+      "description": "32-char lowercase-hex Workday WID, or \"TBD\"."
+    },
+    "filterValue": {
+      "type": "string",
+      "minLength": 1,
+      "description": "navigableFilter value (opaque string) or \"TBD\"."
+    },
+    "persona": {
+      "type": "object",
+      "additionalProperties": false,
+      "allOf": [{ "$ref": "#/definitions/noSecretLiterals" }],
+      "required": ["identityRef", "credentialRef", "expect"],
+      "properties": {
+        "identityRef": { "$ref": "#/definitions/ref" },
+        "credentialRef": { "$ref": "#/definitions/ref" },
+        "expect": { "enum": ["full-access", "restricted-hierarchy", "no-navigate-org-domain", "segmented-visibility"] }
+      }
+    }
+  },
+
+  "allOf": [
+    {
+      "if": { "properties": { "environment": { "const": "skylab" } } },
+      "then": { "properties": { "personas": { "required": ["A", "B", "C", "D"] } } }
+    }
+  ],
+
+  "properties": {
+    "environment": { "enum": ["suv", "skylab"] },
+
+    "personas": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "A": { "$ref": "#/definitions/persona" },
+        "B": { "$ref": "#/definitions/persona" },
+        "C": { "$ref": "#/definitions/persona" },
+        "D": { "$ref": "#/definitions/persona" }
+      }
+    },
+
+    "wids": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ORG_VIS", "ORG_HID", "WKR_VIS", "WKR_HID", "POS_VIS", "POS_HID",
+        "CHILD_HP", "PARENT_MIX", "ORG_BIG", "WID_BAD", "WID_GHOST"
+      ],
+      "properties": {
+        "ORG_VIS": { "$ref": "#/definitions/widValue" },
+        "ORG_HID": { "$ref": "#/definitions/widValue" },
+        "WKR_VIS": { "$ref": "#/definitions/widValue" },
+        "WKR_HID": { "$ref": "#/definitions/widValue" },
+        "POS_VIS": { "$ref": "#/definitions/widValue" },
+        "POS_HID": { "$ref": "#/definitions/widValue" },
+        "CHILD_HP": { "$ref": "#/definitions/widValue" },
+        "PARENT_MIX": { "$ref": "#/definitions/widValue" },
+        "ORG_BIG": { "$ref": "#/definitions/widValue" },
+        "WID_BAD": { "$ref": "#/definitions/widValue" },
+        "WID_GHOST": { "$ref": "#/definitions/widValue" }
+      }
+    },
+
+    "filters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["FLT_OK", "FLT_BAD"],
+      "properties": {
+        "FLT_OK": { "$ref": "#/definitions/filterValue" },
+        "FLT_BAD": { "$ref": "#/definitions/filterValue" }
+      }
+    }
+  }
+}

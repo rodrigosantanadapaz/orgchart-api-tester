@@ -1,0 +1,10 @@
+# Configuration / loader / engine (frozen layers)
+jsonschema>=4.20
+pytest>=8.0
+
+# Web application layer
+fastapi>=0.110
+uvicorn>=0.27
+
+# Read-only HTTP transport and FastAPI TestClient.
+httpx>=0.27

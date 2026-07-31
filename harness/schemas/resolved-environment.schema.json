@@ -1,0 +1,130 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:workday:oc:org-21922:resolved-environment.schema",
+  "title": "Org Chart REST API Security Test — Resolved (post-merge) Environment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["activeEnvironment", "tenant", "restBaseTemplate", "host", "toggle", "auth", "defaultHeaders", "timeouts", "pagination", "evidence", "tls", "roles", "testDataRef"],
+
+  "definitions": {
+    "ref": { "type": "string", "pattern": "^(env:|secret:)[A-Za-z0-9_]+$" },
+    "noSecretLiterals": {
+      "not": {
+        "anyOf": [
+          { "required": ["password"] }, { "required": ["clientSecret"] },
+          { "required": ["refreshToken"] }, { "required": ["token"] },
+          { "required": ["cookie"] }, { "required": ["apiKey"] }, { "required": ["secret"] }
+        ]
+      }
+    },
+    "tls": {
+      "type": "object", "additionalProperties": false, "required": ["verify"],
+      "properties": { "verify": { "type": "boolean" }, "reason": { "type": "string", "minLength": 1 } }
+    },
+    "toggle": {
+      "type": "object", "additionalProperties": false, "required": ["name", "expectedState"],
+      "properties": {
+        "name": { "type": "string" },
+        "expectedState": { "enum": ["on", "off", "tbd"] },
+        "source": { "type": "string" }
+      }
+    },
+    "auth": {
+      "type": "object", "additionalProperties": false, "required": ["model"],
+      "allOf": [{ "$ref": "#/definitions/noSecretLiterals" }],
+      "properties": {
+        "model": { "enum": ["tbd", "oauth2_refresh_token_per_user", "oauth2_client_credentials_acting_as"] },
+        "supportedModels": { "type": "array", "items": { "enum": ["oauth2_refresh_token_per_user", "oauth2_client_credentials_acting_as"] } },
+        "scheme": { "const": "Bearer" },
+        "tokenUrlTemplate": { "type": "string" },
+        "clientIdRef": { "$ref": "#/definitions/ref" },
+        "clientSecretRef": { "$ref": "#/definitions/ref" },
+        "actingAs": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "mechanism": { "type": "string" },
+            "headerName": { "type": "string" },
+            "valueRef": { "$ref": "#/definitions/ref" }
+          }
+        }
+      }
+    },
+    "defaultHeaders": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "Accept": { "type": "string" },
+        "Accept-Language": { "type": "string" },
+        "Content-Type": { "type": "string" }
+      }
+    },
+    "timeouts": {
+      "type": "object", "additionalProperties": false,
+      "required": ["connectMs", "readMs", "tokenMs"],
+      "properties": {
+        "connectMs": { "type": "integer", "minimum": 1 },
+        "readMs": { "type": "integer", "minimum": 1 },
+        "tokenMs": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "pagination": {
+      "type": "object", "additionalProperties": false,
+      "required": ["defaultLimit", "maxLimit", "promptMaxLimit"],
+      "properties": {
+        "defaultLimit": { "type": "integer", "minimum": 1 },
+        "maxLimit": { "type": "integer", "minimum": 1 },
+        "promptMaxLimit": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "evidenceBase": {
+      "type": "object", "additionalProperties": false, "required": ["collect"],
+      "properties": {
+        "collect": { "type": "boolean" },
+        "dir": { "type": "string" },
+        "redactHeaders": { "type": "array", "items": { "type": "string" } },
+        "captureResponseHeaders": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+
+  "allOf": [
+    { "$ref": "#/definitions/noSecretLiterals" },
+    {
+      "if": { "properties": { "activeEnvironment": { "const": "skylab" } } },
+      "then": {
+        "properties": {
+          "tls": { "properties": { "verify": { "const": true } } },
+          "evidence": { "required": ["collect", "dir"], "properties": { "collect": { "const": true } } }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "activeEnvironment": { "const": "suv" } } },
+      "then": {
+        "properties": {
+          "evidence": { "properties": { "collect": { "const": false } } },
+          "tls": {
+            "if": { "properties": { "verify": { "const": false } } },
+            "then": { "required": ["verify", "reason"] }
+          }
+        }
+      }
+    }
+  ],
+
+  "properties": {
+    "activeEnvironment": { "enum": ["suv", "skylab"] },
+    "purpose": { "type": "string" },
+    "tenant": { "type": "string" },
+    "restBaseTemplate": { "type": "string" },
+    "host": { "type": "string" },
+    "toggle": { "$ref": "#/definitions/toggle" },
+    "auth": { "$ref": "#/definitions/auth" },
+    "defaultHeaders": { "$ref": "#/definitions/defaultHeaders" },
+    "timeouts": { "$ref": "#/definitions/timeouts" },
+    "pagination": { "$ref": "#/definitions/pagination" },
+    "evidence": { "$ref": "#/definitions/evidenceBase" },
+    "tls": { "$ref": "#/definitions/tls" },
+    "roles": { "type": "array", "minItems": 1, "items": { "enum": ["A", "B", "C", "D"] } },
+    "testDataRef": { "type": "string" }
+  }
+}
