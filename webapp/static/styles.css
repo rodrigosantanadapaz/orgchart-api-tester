@@ -93,6 +93,26 @@ body {
   box-shadow: 0 0 0 2px rgba(76, 154, 255, 0.25);
 }
 .conn-status { display: flex; align-items: center; gap: 7px; margin-left: auto; font-size: 12px; flex-shrink: 0; }
+.user-identity-badge {
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  max-width: 420px;
+  line-height: 1.35;
+  flex-shrink: 1;
+}
+.user-identity-badge[hidden] { display: none !important; }
+.user-identity-badge .user-name { font-weight: 600; color: var(--green); }
+.user-identity-badge .user-sub {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  display: block;
+  margin-top: 2px;
+}
 .oauth-panel {
   display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap;
   padding: 0 16px 10px; background: var(--bg-elev);
@@ -104,6 +124,14 @@ body {
   color: var(--text-dim); padding-bottom: 9px; min-width: 42px;
 }
 .oauth-hint { font-size: 11px; color: var(--muted); padding-bottom: 9px; }
+.oauth-guide-link {
+  font-size: 12px;
+  color: var(--accent);
+  align-self: center;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.oauth-guide-link:hover { text-decoration: underline; }
 .field-wide input { min-width: 220px; }
 .status-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
 .status-dot[data-state="connected"] { background: var(--green); box-shadow: 0 0 8px var(--green); }

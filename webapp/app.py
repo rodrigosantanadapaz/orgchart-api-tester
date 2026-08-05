@@ -16,6 +16,8 @@ from typing import Optional
 from fastapi import FastAPI, status
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.responses import Response
+from starlette.types import Scope
 
 from engine import catalog
 from engine.catalog import CATEGORIES
@@ -44,6 +46,7 @@ from .models import (
     OpenApiCatalogRequest,
     OpenApiCatalogResponse,
     OpenApiCatalogResult,
+    MeResponse,
 )
 from .service import (
     VALID_MODES,
@@ -57,6 +60,24 @@ from .suv_id_token import SuvAuthError
 from .oauth_token import OAuthTokenError
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+
+class DevStaticFiles(StaticFiles):
+    """Serve static assets with no-cache in local dev so module updates load immediately."""
+
+    async def get_response(self, path: str, scope: Scope) -> Response:
+        response = await super().get_response(path, scope)
+        if path.endswith((".js", ".css", ".html")):
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+        return response
+
+
+def _oauth_only_session(session) -> bool:
+    return (
+        environment_key_for_host(session.host) == "skylab"
+        and session.username == "oauth"
+    )
 
 
 def create_app(service: Optional[ExecutionService] = None) -> FastAPI:
@@ -124,6 +145,12 @@ def create_app(service: Optional[ExecutionService] = None) -> FastAPI:
         session = service.connection
         if session is None:
             return ConfigResponse(mode=service.mode, modes=list(VALID_MODES), connected=False)
+        oauth_only = (
+            _oauth_only_session(session)
+            and service.mode == "live"
+        )
+        if oauth_only:
+            service.refresh_oauth_identity()
         return ConfigResponse(
             mode=service.mode,
             modes=list(VALID_MODES),
@@ -131,6 +158,26 @@ def create_app(service: Optional[ExecutionService] = None) -> FastAPI:
             host=session.host,
             tenant=session.tenant,
             username=session.username,
+            identity=session.identity,
+            userSub=session.user_sub,
+            userLogin=session.user_login,
+            oauthOnly=oauth_only,
+        )
+
+    @app.get("/api/me", response_model=MeResponse)
+    async def get_me() -> MeResponse:
+        session = service.connection
+        if session is None:
+            return MeResponse(connected=False)
+        if _oauth_only_session(session) and service.mode == "live":
+            service.refresh_oauth_identity()
+        profile = session.user_profile()
+        return MeResponse(
+            connected=True,
+            sub=profile.sub,
+            displayName=profile.display_name,
+            login=profile.login,
+            label=profile.label,
         )
 
     @app.post("/api/mode", response_model=ConfigResponse)
@@ -145,10 +192,23 @@ def create_app(service: Optional[ExecutionService] = None) -> FastAPI:
             host=req.host, tenant=req.tenant, username=req.username, password=req.password
         )
         env_key = environment_key_for_host(conn.host)
-        if env_key == "skylab" and service.mode == "live" and conn.username == "oauth":
+        oauth_only = env_key == "skylab" and service.mode == "live" and conn.username == "oauth"
+        if oauth_only and conn.user_sub:
+            if conn.identity:
+                message = (
+                    f"Connected as {conn.identity} (sub: {conn.user_sub}) "
+                    f"to {conn.host} tenant {conn.tenant} [{service.mode} mode]."
+                )
+            else:
+                message = (
+                    f"Connected with user sub {conn.user_sub} to {conn.host} "
+                    f"tenant {conn.tenant} [{service.mode} mode]. "
+                    "Profile name could not be loaded from /users/{sub}."
+                )
+        elif oauth_only:
             message = (
                 f"Connected to {conn.host} (tenant {conn.tenant}) via OAuth Bearer "
-                f"[{service.mode} mode]. Username is not used on SkyLab."
+                f"[{service.mode} mode]. Could not resolve user profile from token."
             )
         else:
             message = (
@@ -162,6 +222,10 @@ def create_app(service: Optional[ExecutionService] = None) -> FastAPI:
             username=conn.username,
             mode=service.mode,
             message=message,
+            identity=conn.identity,
+            userSub=conn.user_sub,
+            userLogin=conn.user_login,
+            oauthOnly=oauth_only,
         )
 
     @app.post("/api/disconnect", response_model=DisconnectResponse)
@@ -273,7 +337,14 @@ def create_app(service: Optional[ExecutionService] = None) -> FastAPI:
 
     @app.post("/api/execute", response_model=ExecuteResponse)
     async def execute(req: ExecuteRequest) -> ExecuteResponse:
-        persona = req.persona or (service.connection.username if service.connection else None)
+        session = service.connection
+        default_persona = None
+        if session is not None:
+            if session.username == "oauth":
+                default_persona = session.identity or session.user_sub
+            else:
+                default_persona = session.username
+        persona = req.persona or default_persona
         built, response, duration_ms = service.execute(
             req.endpoint_id, req.parameters, persona=persona
         )
@@ -297,11 +368,18 @@ def create_app(service: Optional[ExecutionService] = None) -> FastAPI:
         )
 
     # --------------------------- frontend ----------------------------- #
-    app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
+    @app.get("/guide/skylab-oauth")
+    async def skylab_oauth_guide() -> FileResponse:
+        return FileResponse(str(_STATIC_DIR / "guide" / "skylab-oauth.html"))
+
+    app.mount("/static", DevStaticFiles(directory=str(_STATIC_DIR)), name="static")
 
     @app.get("/")
     async def index() -> FileResponse:
-        return FileResponse(str(_STATIC_DIR / "index.html"))
+        response = FileResponse(str(_STATIC_DIR / "index.html"))
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        return response
 
     return app
 

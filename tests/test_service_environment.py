@@ -56,14 +56,49 @@ def test_skylab_live_connect_ignores_username_with_bearer():
     assert session.auth.authorization_header(None) == "Bearer test-token"
 
 
-def test_skylab_live_connect_accepts_raw_jwt_access_token():
-    jwt = "eyJhbGci.test.signature"
+def test_skylab_live_connect_extracts_identity_from_jwt():
+    import base64
+    import json
+
+    header = base64.urlsafe_b64encode(b'{"alg":"RS256"}').decode().rstrip("=")
+    body = base64.urlsafe_b64encode(
+        json.dumps({"sub": "wd-developer@performance"}).encode()
+    ).decode().rstrip("=")
+    jwt = f"{header}.{body}.signature"
     client = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, json={})))
     service = ExecutionService(mode="live", http_client=client)
     session = service.connect(
         "org.skylab.inday.io",
         "performance",
-        "wd-developer",
+        "oauth",
         jwt,
     )
-    assert session.auth.authorization_header(None) == f"Bearer {jwt}"
+    assert session.username == "oauth"
+    assert session.identity == "wd-developer"
+
+
+def test_skylab_live_connect_resolves_identity_from_users_me():
+    import base64
+    import json
+
+    header = base64.urlsafe_b64encode(b'{"alg":"RS256"}').decode().rstrip("=")
+    body = base64.urlsafe_b64encode(
+        json.dumps({"sub": "eca89d2b3b1d1031988ee96a23920000"}).encode()
+    ).decode().rstrip("=")
+    jwt = f"{header}.{body}.signature"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "/users/eca89d2b3b1d1031988ee96a23920000" in request.url.path:
+            return httpx.Response(200, json={"name": "Rodrigo SO"})
+        return httpx.Response(200, json={})
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    service = ExecutionService(mode="live", http_client=client)
+    session = service.connect(
+        "org.skylab.inday.io",
+        "performance",
+        "oauth",
+        jwt,
+    )
+    assert session.identity == "Rodrigo SO"
+    assert session.user_sub == "eca89d2b3b1d1031988ee96a23920000"

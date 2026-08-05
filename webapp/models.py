@@ -28,6 +28,10 @@ class ConnectResponse(BaseModel):
     username: str
     mode: str
     message: str
+    identity: Optional[str] = None
+    userSub: Optional[str] = None
+    userLogin: Optional[str] = None
+    oauthOnly: bool = False
 
 
 class DisconnectResponse(BaseModel):
@@ -69,6 +73,18 @@ class ConfigResponse(BaseModel):
     host: Optional[str] = None
     tenant: Optional[str] = None
     username: Optional[str] = None
+    identity: Optional[str] = None
+    userSub: Optional[str] = None
+    userLogin: Optional[str] = None
+    oauthOnly: bool = False
+
+
+class MeResponse(BaseModel):
+    connected: bool
+    sub: Optional[str] = None
+    displayName: Optional[str] = None
+    login: Optional[str] = None
+    label: Optional[str] = None
 
 
 class SetModeRequest(BaseModel):

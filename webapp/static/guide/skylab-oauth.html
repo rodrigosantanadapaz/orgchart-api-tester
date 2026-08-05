@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Skylab OAuth Setup — Org Chart API Tester</title>
+  <link rel="stylesheet" href="/static/styles.css?v=5" />
+  <style>
+    .guide-page {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 24px 20px 48px;
+      overflow: auto;
+      height: 100vh;
+      line-height: 1.55;
+    }
+    .guide-page h1 { font-size: 1.6rem; margin-top: 0; }
+    .guide-page h2 { font-size: 1.15rem; margin-top: 2rem; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+    .guide-page h3 { font-size: 1rem; margin-top: 1.25rem; color: var(--text-dim); }
+    .guide-page p, .guide-page li { color: var(--text-dim); }
+    .guide-page a { color: var(--accent); }
+    .guide-page code, .guide-page pre {
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+    .guide-page pre {
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      overflow-x: auto;
+      color: var(--text);
+    }
+    .guide-page table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin: 12px 0;
+    }
+    .guide-page th, .guide-page td {
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      text-align: left;
+    }
+    .guide-page th { background: var(--bg-elev); color: var(--text); }
+    .guide-back {
+      display: inline-block;
+      margin-bottom: 16px;
+      font-size: 13px;
+    }
+    .guide-callout {
+      background: var(--bg-elev);
+      border-left: 3px solid var(--accent);
+      padding: 10px 14px;
+      margin: 16px 0;
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    }
+  </style>
+</head>
+<body>
+  <article class="guide-page">
+    <a class="guide-back" href="/">← Back to Org Chart API Tester</a>
+
+    <h1>Skylab OAuth Setup Guide</h1>
+    <p>Configure OAuth for the <strong>Org Chart API Tester</strong> against Workday Skylab.</p>
+
+    <table>
+      <thead><tr><th>Item</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Skylab URL</td><td><a href="https://org.skylab.inday.io/reports" target="_blank" rel="noopener">org.skylab.inday.io/reports</a></td></tr>
+        <tr><td>Tenant</td><td><code>performance</code></td></tr>
+        <tr><td>Token endpoint</td><td><code>https://org.skylab.inday.io/ccx/oauth2/performance/token</code></td></tr>
+        <tr><td>Org Chart API</td><td><code>/ccx/internalapi/orgchart/v1/performance</code></td></tr>
+      </tbody>
+    </table>
+
+    <div class="guide-callout">
+      Skylab Live mode uses a <strong>Bearer access token</strong> only. User identity is encoded in the token — the Username field is not used.
+    </div>
+
+    <h2>Path 1 — Generate credentials yourself (recommended)</h2>
+
+    <h3>Step 1 — Register an API Client (one-time)</h3>
+    <p>In the Skylab <code>performance</code> tenant:</p>
+    <ol>
+      <li>Open <strong>Register API Client for Integrations</strong> (<code>2997$5931</code>).</li>
+      <li>Create a client (e.g. <strong>Org Chart API Tester</strong>).</li>
+      <li>Enable scope <strong>Organizations and Roles</strong> (required for <code>orgchart</code>).</li>
+      <li>Token user must have domain <strong>Reports: Navigate Organization</strong>.</li>
+      <li>Save <strong>Client ID</strong> and <strong>Client Secret</strong> (secret shown only once).</li>
+    </ol>
+
+    <h3>Step 2 — Generate a refresh token</h3>
+    <ol>
+      <li>On the API Client, open <strong>Manage Refresh Tokens</strong>.</li>
+      <li>Select the user (<code>wd-developer</code> or superuser).</li>
+      <li>Click <strong>Generate</strong> and copy the refresh token.</li>
+      <li>Store securely — do not commit to git.</li>
+    </ol>
+    <p>If you change scopes later, regenerate the refresh token.</p>
+
+    <h3>Step 3 — Exchange refresh token → access token (curl)</h3>
+    <pre>export OC_OAUTH_CLIENT_ID='your-client-id'
+export OC_OAUTH_CLIENT_SECRET='your-client-secret'
+export REFRESH_TOKEN='your-refresh-token'
+
+curl -sS -X POST 'https://org.skylab.inday.io/ccx/oauth2/performance/token' \
+  -u "${OC_OAUTH_CLIENT_ID}:${OC_OAUTH_CLIENT_SECRET}" \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d "grant_type=refresh_token" \
+  -d "refresh_token=${REFRESH_TOKEN}" | python3 -m json.tool</pre>
+    <p>Copy <code>access_token</code> from the response. Tokens expire (~1 hour).</p>
+
+    <h3>Step 4 — Connect in the tester</h3>
+    <ol>
+      <li><strong>Mode:</strong> Live · <strong>Host:</strong> <code>org.skylab.inday.io</code> · <strong>Tenant:</strong> <code>performance</code></li>
+      <li><strong>Password:</strong> <code>Bearer &lt;access_token&gt;</code> or paste raw JWT</li>
+      <li>Click <strong>Connect</strong></li>
+    </ol>
+
+    <h3>Step 5 — Use Get token (recommended)</h3>
+    <ol>
+      <li>Set Live mode, Skylab host and <code>performance</code> tenant.</li>
+      <li>Expand the <strong>OAuth</strong> panel.</li>
+      <li>Enter Client ID, Client Secret, and Refresh Token.</li>
+      <li>Click <strong>Get token</strong> — access token fills Password automatically.</li>
+      <li>Click <strong>Connect</strong>.</li>
+    </ol>
+    <p>Secrets are sent only to your local backend for the exchange; they are not saved to disk.</p>
+
+    <h2>Path 2 — Pre-provisioned credentials (ORG-21922)</h2>
+    <p>Request via Slack / 1Password (not Jira):</p>
+    <table>
+      <thead><tr><th>Variable</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>OC_OAUTH_CLIENT_ID</code></td><td>API Client ID</td></tr>
+        <tr><td><code>OC_OAUTH_CLIENT_SECRET</code></td><td>Client secret</td></tr>
+        <tr><td><code>OC_SKYLAB_TOKEN_A</code></td><td>Refresh token — Persona A</td></tr>
+        <tr><td><code>OC_SKYLAB_TOKEN_B</code></td><td>Refresh token — Persona B</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Path 3 — SUV without OAuth</h2>
+    <p>Use a SUV (<code>*.workdaysuv.com</code>) in Live mode with username + password. ID token is obtained automatically. Not valid for official ORG-21922 Skylab sign-off.</p>
+
+    <h2>Troubleshooting</h2>
+    <table>
+      <thead><tr><th>Symptom</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td><code>invalid_client</code></td><td>Check Client ID and Client Secret</td></tr>
+        <tr><td><code>invalid_grant</code></td><td>Regenerate refresh token</td></tr>
+        <tr><td>API 400</td><td>Use 32-char hex WID, not internal IDs like <code>2500$102</code></td></tr>
+        <tr><td>API 401 / 403</td><td>User needs <strong>Reports: Navigate Organization</strong>; check API Client scopes</td></tr>
+        <tr><td>Upstream 401 after connect</td><td>Token expired — click <strong>Get token</strong> again</td></tr>
+        <tr><td><code>token:eyJ…</code> in Password</td><td>Use <code>Bearer eyJ…</code> or raw JWT — not <code>token:</code></td></tr>
+      </tbody>
+    </table>
+    <p>Always check <strong>Upstream</strong> status in the tester, not proxy HTTP 200.</p>
+  </article>
+</body>
+</html>

@@ -87,13 +87,15 @@ Switch mode **before** connecting. If you reload the page while connected, the U
 
 Skylab Live mode is **Bearer-token only**. The username field is disabled — identity is encoded in the OAuth access token.
 
+**Full guide:** [`docs/skylab-oauth-setup.md`](docs/skylab-oauth-setup.md) · [Confluence](https://confluence.workday.com/pages/viewpage.action?pageId=4521268620) · in-app: http://127.0.0.1:8000/guide/skylab-oauth
+
 1. Set mode to **Live**.
-2. Enter host (`org.skylab.inday.io`) and tenant (e.g. `performance`).
-3. Expand **OAuth** and fill Client ID, Client Secret, and Refresh Token.
+2. Enter host (`org.skylab.inday.io`) and tenant (`performance`).
+3. Expand **OAuth** and fill Client ID, Client Secret, and Refresh Token (see guide for how to obtain these on Skylab).
 4. Click **Get token** — the access token is placed in the Password field.
 5. Click **Connect**.
 
-You can also paste `Bearer eyJ…` or a raw JWT directly into Password.
+You can also paste `Bearer eyJ…` or a raw JWT directly into Password, or exchange tokens manually with `curl` (documented in the setup guide).
 
 ### SUV (Workday development instance)
 
@@ -172,7 +174,7 @@ python scripts/skylab_openapi_check.py --host org.skylab.inday.io --tenant perfo
 
 ## Security test plans
 
-Manual security testing is documented in [`docs/security-test-plan.md`](docs/security-test-plan.md) (cases T-01 through T-18). There is **no automated runner** for these cases — execute them through the UI:
+Manual security testing is documented in [`docs/ORG-21922-security-validation-plan.md`](docs/ORG-21922-security-validation-plan.md) (v4.1 — full ORG-21922 scope on Skylab; cases OC-NAV / OC-CHILD / OC-PARENT / OC-WRK / OC-ORG / OC-FLT / OC-X). There is **no automated runner** — execute through the UI and record upstream results.
 
 1. Connect in **Live** mode with the appropriate persona (User A–D).
 2. Select the endpoint and parameters from the catalog.

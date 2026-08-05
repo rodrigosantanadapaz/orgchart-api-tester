@@ -41,9 +41,14 @@ export function getCatalog() {
   return request("/api/catalog");
 }
 
-/** @returns {Promise<{mode:string,modes:string[]}>} */
+/** @returns {Promise<{mode:string,modes:string[],connected?:boolean,identity?:string,userSub?:string,userLogin?:string,oauthOnly?:boolean}>} */
 export function getConfig() {
   return request("/api/config");
+}
+
+/** @returns {Promise<{connected:boolean,sub?:string,displayName?:string,login?:string,label?:string}>} */
+export function getMe() {
+  return request("/api/me");
 }
 
 /** @param {"mock"|"live"} mode */

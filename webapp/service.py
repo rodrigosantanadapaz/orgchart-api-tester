@@ -31,6 +31,7 @@ from engine.request_builder import BuiltRequest
 from harness.loader import deep_merge, load_config
 from transport import HttpxTransport
 
+from .oauth_user import AuthenticatedUser, resolve_authenticated_user
 from .mock_transport import MockTransport
 from .oauth_token import OAuthTokenError, exchange_refresh_token, token_url_from_resolved
 from .session_auth import StaticSessionAuthProvider
@@ -108,7 +109,24 @@ class Session:
     tenant: str
     username: str
     auth: StaticSessionAuthProvider | SuvIdTokenProvider
+    identity: Optional[str] = None
+    user_sub: Optional[str] = None
+    user_login: Optional[str] = None
+    display_name: Optional[str] = None
     transport: Optional[HttpxTransport] = None
+
+    def apply_user(self, user: AuthenticatedUser) -> None:
+        self.user_sub = user.sub
+        self.user_login = user.login
+        self.display_name = user.display_name
+        self.identity = user.label
+
+    def user_profile(self) -> AuthenticatedUser:
+        return AuthenticatedUser(
+            sub=self.user_sub,
+            display_name=self.display_name,
+            login=self.user_login,
+        )
 
     def destroy(self) -> None:
         self.auth.clear()
@@ -145,6 +163,27 @@ class ExecutionService:
     def is_connected(self) -> bool:
         return self._session is not None
 
+    def refresh_oauth_identity(self) -> AuthenticatedUser:
+        """Re-resolve token bearer profile from JWT sub + CCX REST."""
+        session = self._session
+        empty = AuthenticatedUser()
+        if session is None or session.username != "oauth":
+            return session.user_profile() if session else empty
+        if self._mode != "live" or session.transport is None:
+            return session.user_profile()
+        auth_value = session.auth.authorization_header(None)
+        if not auth_value:
+            return session.user_profile()
+        user = resolve_authenticated_user(
+            auth_value,
+            host=session.host,
+            tenant=session.tenant,
+            client=session.transport._get_client(),  # noqa: SLF001
+            timeout=session.transport.timeout,
+        )
+        session.apply_user(user)
+        return user
+
     def set_mode(self, mode: str) -> None:
         """Switch execution mode (mock vs live). Requires an idle session."""
         if self._session is not None:
@@ -167,12 +206,15 @@ class ExecutionService:
             password = _normalize_live_password(password)
 
         transport: Optional[HttpxTransport] = None
+        oauth_user: Optional[AuthenticatedUser] = None
         env_key = environment_key_for_host(host)
+        auth_header: Optional[str] = None
         if self._mode == "live" and _is_prebuilt_auth_header(password):
             if env_key == "skylab":
                 username = "oauth"
+            auth_header = _build_authorization_header(username, password)
             auth: StaticSessionAuthProvider | SuvIdTokenProvider = StaticSessionAuthProvider(
-                _build_authorization_header(username, password)
+                auth_header
             )
         elif self._mode == "live" and env_key == "skylab":
             raise SuvAuthError(
@@ -209,9 +251,28 @@ class ExecutionService:
             transport = HttpxTransport.from_resolved(
                 resolved, auth_provider=auth, client=self._http_client
             )
+        if (
+            self._mode == "live"
+            and env_key == "skylab"
+            and username == "oauth"
+            and auth_header
+        ):
+            oauth_user = resolve_authenticated_user(
+                auth_header,
+                host=host,
+                tenant=tenant,
+                client=transport._get_client() if transport is not None else self._http_client,
+                timeout=transport.timeout if transport is not None else None,
+            )
         self._session = Session(
-            host=host, tenant=tenant, username=username, auth=auth, transport=transport
+            host=host,
+            tenant=tenant,
+            username=username,
+            auth=auth,
+            transport=transport,
         )
+        if oauth_user is not None:
+            self._session.apply_user(oauth_user)
         return self._session
 
     def disconnect(self) -> None:

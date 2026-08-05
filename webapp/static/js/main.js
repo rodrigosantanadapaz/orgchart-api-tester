@@ -7,7 +7,7 @@ import { CatalogNav } from "./catalog.js";
 import { RequestForm } from "./form.js";
 import { ResponseView } from "./response.js";
 import { History } from "./history.js";
-import { Connection } from "./connection.js";
+import { Connection } from "./connection.js?v=11";
 
 class App {
   constructor() {
@@ -91,7 +91,7 @@ class App {
         endpoint_id: this.currentId,
         parameters,
         persona: this.connection.state?.oauthOnly
-          ? "OAuth token"
+          ? (this.connection.state?.identity || this.connection.state?.userSub || "OAuth token")
           : this.connection.username,
       });
       this.response.render(result);

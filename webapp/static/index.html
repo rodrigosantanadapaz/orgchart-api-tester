@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Org Chart API Tester</title>
-  <link rel="stylesheet" href="/static/styles.css?v=4" />
+  <link rel="stylesheet" href="/static/styles.css?v=6" />
 </head>
 <body>
   <!-- Top connection panel -->
@@ -46,6 +46,7 @@
         <span class="status-dot" data-state="disconnected"></span>
         <span class="status-text">Disconnected</span>
       </div>
+      <div id="user-identity-badge" class="user-identity-badge" hidden></div>
     </form>
   </header>
 
@@ -65,7 +66,8 @@
       <input id="oauth-refresh-token" type="password" autocomplete="off" placeholder="Per-user refresh token" />
     </label>
     <button id="oauth-get-token-button" class="btn btn-ghost" type="button">Get token</button>
-    <span class="oauth-hint">SkyLab: exchange refresh token → Bearer in Password.</span>
+    <a class="oauth-guide-link" href="/guide/skylab-oauth" target="_blank" rel="noopener">OAuth setup guide</a>
+    <span class="oauth-hint">Exchange refresh token → Bearer in Password. Credentials stay in this session only.</span>
   </div>
 
   <!-- Main 3-column workspace -->
@@ -137,6 +139,6 @@
     <div class="spinner" aria-label="Loading"></div>
   </div>
 
-  <script type="module" src="/static/js/main.js?v=7"></script>
+  <script type="module" src="/static/js/main.js?v=11"></script>
 </body>
 </html>

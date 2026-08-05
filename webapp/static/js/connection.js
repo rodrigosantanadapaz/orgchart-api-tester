@@ -3,6 +3,7 @@ import { $ } from "./dom.js";
 import * as api from "./api.js";
 import { ApiError } from "./api.js";
 import { toast } from "./ui.js";
+import { extractSubFromPasswordField } from "./jwt.js?v=11";
 
 export class Connection {
   /** @param {(connected:boolean)=>void} onChange */
@@ -21,7 +22,8 @@ export class Connection {
     this.oauthGetTokenBtn = /** @type {HTMLButtonElement} */ ($("#oauth-get-token-button"));
     this.usernameInput = /** @type {HTMLInputElement} */ ($("#conn-username"));
     this.usernameField = /** @type {HTMLElement} */ ($("#conn-username-field"));
-    /** @type {?{host:string,tenant:string,username:string,mode:string,oauthOnly?:boolean}} */
+    this.userBadge = /** @type {HTMLElement} */ ($("#user-identity-badge"));
+    /** @type {?{host:string,tenant:string,username:string,mode:string,oauthOnly?:boolean,identity?:string|null,userSub?:string|null,userLogin?:string|null}} */
     this.state = null;
 
     this.form.addEventListener("submit", (e) => { e.preventDefault(); this.connect(); });
@@ -45,9 +47,66 @@ export class Connection {
     return this.modeSelect.value === "live" && this._isSkylabHost(host);
   }
 
-  _connectionStatusLabel(host, tenant, username, oauthOnly) {
-    if (oauthOnly) return `Connected · OAuth → ${tenant}@${host}`;
+  _connectionStatusLabel(host, tenant, username, oauthOnly, identity, userSub) {
+    if (oauthOnly) {
+      if (identity && userSub) {
+        return `Connected · ${identity} @ ${host} (${tenant})`;
+      }
+      if (userSub) {
+        return `Connected · sub ${userSub} @ ${host} (${tenant})`;
+      }
+      return `Connected · OAuth → ${tenant}@${host}`;
+    }
     return `Connected · ${username}@${host}`;
+  }
+
+  _renderUserBadge(identity, userSub) {
+    if (!userSub && !identity) {
+      this.userBadge.hidden = true;
+      this.userBadge.textContent = "";
+      return;
+    }
+    this.userBadge.hidden = false;
+    const name = identity || "(name pending)";
+    const subLine = userSub ? `sub: ${userSub}` : "";
+    this.userBadge.innerHTML = [
+      `<span class="user-name">${this._escapeHtml(name)}</span>`,
+      subLine ? `<span class="user-sub">${this._escapeHtml(subLine)}</span>` : "",
+    ].join("");
+  }
+
+  /** @param {string} text */
+  _escapeHtml(text) {
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  _statusTitle(oauthOnly, identity, userSub, userLogin) {
+    if (!oauthOnly) return "";
+    const parts = [];
+    if (identity) parts.push(`User: ${identity}`);
+    if (userLogin) parts.push(`Login: ${userLogin}`);
+    if (userSub) parts.push(`sub: ${userSub}`);
+    return parts.join(" · ");
+  }
+
+  async _enrichWithUserProfile(summary) {
+    if (!summary.oauthOnly) return summary;
+    try {
+      const me = await api.getMe();
+      if (me.connected) {
+        return {
+          ...summary,
+          identity: me.label ?? me.displayName ?? summary.identity,
+          userSub: me.sub ?? summary.userSub ?? null,
+          userLogin: me.login ?? summary.userLogin ?? null,
+        };
+      }
+    } catch { /* keep server connect/config summary */ }
+    return summary;
   }
   get isConnected() { return this.state != null; }
 
@@ -56,12 +115,17 @@ export class Connection {
     this._applyMode(cfg.mode);
     this.modeSelect.value = cfg.mode;
     if (cfg.connected && cfg.host && cfg.tenant && cfg.username) {
-      this._restoreConnectedState({
+      const summary = await this._enrichWithUserProfile({
         host: cfg.host,
         tenant: cfg.tenant,
         username: cfg.username,
         mode: cfg.mode,
+        identity: cfg.identity ?? null,
+        userSub: cfg.userSub ?? null,
+        userLogin: cfg.userLogin ?? null,
+        oauthOnly: cfg.oauthOnly ?? false,
       });
+      this._restoreConnectedState(summary);
     } else {
       this._clearConnectedState();
     }
@@ -74,17 +138,40 @@ export class Connection {
     const oauthOnly = summary.oauthOnly ?? (
       summary.mode === "live" && this._isSkylabHost(summary.host)
     );
-    this.usernameInput.value = oauthOnly ? "" : summary.username;
-    this.state = { ...summary, oauthOnly };
+    const identity = summary.identity ?? null;
+    if (oauthOnly && identity) {
+      this.usernameInput.value = identity;
+    } else if (oauthOnly && summary.userSub) {
+      this.usernameInput.value = summary.userSub;
+    } else {
+      this.usernameInput.value = oauthOnly ? "" : summary.username;
+    }
+    this.state = {
+      ...summary,
+      oauthOnly,
+      identity,
+      userSub: summary.userSub ?? null,
+      userLogin: summary.userLogin ?? null,
+    };
     this._applyMode(summary.mode);
     this.modeSelect.value = summary.mode;
     this._setModeLocked(true);
-    this._setStatus("connected", this._connectionStatusLabel(
+    const statusText = this._connectionStatusLabel(
       summary.host,
       summary.tenant,
       summary.username,
-      summary.oauthOnly,
-    ));
+      oauthOnly,
+      identity,
+      summary.userSub ?? null,
+    );
+    this._setStatus("connected", statusText);
+    this.statusText.title = this._statusTitle(
+      oauthOnly,
+      identity,
+      summary.userSub ?? null,
+      summary.userLogin ?? null,
+    );
+    this._renderUserBadge(identity, summary.userSub ?? null);
     this.connectBtn.hidden = true;
     this.probeBtn.hidden = false;
     this.disconnectBtn.hidden = false;
@@ -167,9 +254,14 @@ export class Connection {
     if (skylabOAuth) {
       this.usernameInput.disabled = true;
       this.usernameField.classList.add("is-inactive");
-      if (!this.isConnected) this.usernameInput.value = "";
-      this.usernameInput.placeholder = "Not used — identity is in the Bearer token";
-      this.usernameInput.title = "SkyLab Live uses OAuth Bearer only. The API ignores this field.";
+      if (!this.isConnected) {
+        this.usernameInput.value = "";
+        this.usernameInput.placeholder = "Not used — identity is in the Bearer token";
+      } else if (this.state?.identity) {
+        this.usernameInput.value = this.state.identity;
+        this.usernameInput.placeholder = "Logged-in user (from Bearer token)";
+      }
+      this.usernameInput.title = "SkyLab Live uses OAuth Bearer only. User identity is read from the token.";
       pw.placeholder = "Bearer <OAuth access token>";
       pw.title = "Click Get token, or paste Bearer … manually.";
     } else {
@@ -267,26 +359,47 @@ export class Connection {
       toast("Please fill in username for SUV login.", "error");
       return;
     }
+    if (skylabOAuth) {
+      const previewSub = extractSubFromPasswordField(payload.password);
+      if (!previewSub) {
+        toast("Could not read user ID (sub) from Bearer token — paste a valid JWT.", "error");
+        return;
+      }
+    }
     this._setStatus("connecting", "Connecting…");
     this.connectBtn.disabled = true;
     this._setModeLocked(true);
     try {
       const res = await api.connect(payload);
-      this.state = {
+      const summary = await this._enrichWithUserProfile({
         host: res.host,
         tenant: res.tenant,
         username: res.username,
         mode: res.mode,
         oauthOnly: skylabOAuth,
-      };
+        identity: res.identity ?? null,
+        userSub: res.userSub ?? null,
+        userLogin: res.userLogin ?? null,
+      });
+      this.state = summary;
       this._applyMode(res.mode);
       this.modeSelect.value = res.mode;
-      this._setStatus("connected", this._connectionStatusLabel(
+      const statusText = this._connectionStatusLabel(
         res.host,
         res.tenant,
         res.username,
         skylabOAuth,
-      ));
+        summary.identity ?? null,
+        summary.userSub ?? null,
+      );
+      this._setStatus("connected", statusText);
+      this.statusText.title = this._statusTitle(
+        skylabOAuth,
+        summary.identity ?? null,
+        summary.userSub ?? null,
+        summary.userLogin ?? null,
+      );
+      this._renderUserBadge(summary.identity ?? null, summary.userSub ?? null);
       this.connectBtn.hidden = true;
       this.probeBtn.hidden = false;
       this.disconnectBtn.hidden = false;
@@ -312,6 +425,8 @@ export class Connection {
     this.probeBtn.hidden = true;
     this.disconnectBtn.hidden = true;
     this._setModeLocked(false);
+    this.userBadge.hidden = true;
+    this.userBadge.textContent = "";
     this.onChange(false);
     this._updateOAuthPanel();
   }

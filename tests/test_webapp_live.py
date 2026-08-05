@@ -144,3 +144,63 @@ def test_mock_mode_still_available_after_live_service_fixture(live_client):
         )
         assert resp.status_code == 200
         assert resp.json()["body"]["_mock"] is True
+
+
+def test_skylab_oauth_guide_page(client):
+    resp = client.get("/guide/skylab-oauth")
+    assert resp.status_code == 200
+    assert "Skylab OAuth Setup" in resp.text
+    assert "org.skylab.inday.io" in resp.text
+    assert "Get token" in resp.text
+
+
+def test_skylab_connect_response_includes_identity(client):
+    import base64
+    import json
+
+    client.post("/api/mode", json={"mode": "live"})
+    header = base64.urlsafe_b64encode(b'{"alg":"RS256"}').decode().rstrip("=")
+    body = base64.urlsafe_b64encode(
+        json.dumps({"sub": "eca89d2b3b1d1031988ee96a23920000"}).encode()
+    ).decode().rstrip("=")
+    jwt = f"{header}.{body}.signature"
+
+    from webapp.app import create_app
+    from webapp.service import ExecutionService
+    import httpx
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/users/me"):
+            return httpx.Response(404)
+        if "/users/eca89d2b3b1d1031988ee96a23920000" in request.url.path:
+            return httpx.Response(
+                200,
+                json={"name": "Persona A", "username": "persona_a"},
+            )
+        return httpx.Response(200, json={})
+
+    http = httpx.Client(transport=httpx.MockTransport(handler))
+    service = ExecutionService(mode="live", http_client=http)
+    with __import__("fastapi.testclient", fromlist=["TestClient"]).TestClient(
+        create_app(service=service)
+    ) as live:
+        resp = live.post(
+            "/api/connect",
+            json={
+                "host": "org.skylab.inday.io",
+                "tenant": "performance",
+                "username": "oauth",
+                "password": f"Bearer {jwt}",
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["identity"] == "Persona A"
+        assert data["userSub"] == "eca89d2b3b1d1031988ee96a23920000"
+        assert data["userLogin"] == "persona_a"
+        assert data["oauthOnly"] is True
+
+        me = live.get("/api/me").json()
+        assert me["connected"] is True
+        assert me["label"] == "Persona A"
+        assert me["sub"] == "eca89d2b3b1d1031988ee96a23920000"
